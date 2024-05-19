@@ -1,0 +1,96 @@
+#bash
+#input file
+input_file="$1"
+
+#function for correlation
+compute_correlation() {
+    predictor=$1
+    awk -F"\t" -v predictor="$predictor" ' 
+        BEGIN { sum_xy = sum_x = sum_y = sum_x2 = sum_y2 = n =0 }
+        NR > 1 {
+            x = $predictor
+            y = $8 #Cantril ladder score is column 8
+            if (x != "" && y != "")
+            {
+                sum_xy += x * y
+                sum_x += x
+                sum_y += y
+                sum_x2 += x * x
+                sum_y2 += y * y
+                n++
+
+            
+            }
+            
+        }
+        END {
+            if (n >= 1) {
+                correlation = (n * sum_xy - sum_x * sum_y) / sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2))
+                print correlation
+            }
+        }
+
+    ' "$input_file"
+}
+
+#correlations and mean correlations
+correlation_gdp=$(compute_correlation 4)
+correlation_population=$(compute_correlation 5)
+correlation_homicide=$(compute_correlation 6)
+correlation_life_expectancy=$(compute_correlation 7)
+
+#mean correlations
+mean_correlation_gdp=$(echo "$correlation_gdp" | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n }')
+
+mean_correlation_population=$(echo "$correlation_population" | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n }')
+
+mean_correlation_homicide=$(echo "$correlation_homicide" | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n }')
+
+mean_correlation_life_expectancy=$(echo "$correlation_life_expectancy" | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n }')
+
+#Finding the best predictor
+declare -A correlations=(
+    ["GDP per capita"]=$mean_correlation_gdp
+    ["Population"]=$mean_correlation_population
+    ["Homicide Rate"]=$mean_correlation_homicide
+    ["Life Expectancy"]=$mean_correlation_life_expectancy
+)
+
+best_predictor=""
+best_correlation=0
+
+for predictor in "${!correlations[@]}"; do
+    correlation=${correlations[$predictor]}
+
+    if (( $(echo "$correlation >= 0" | bc -l) )); then
+        if (( $(echo "$correlation > $best_correlation" | bc -l) )); then
+            best_predictor="$predictor"
+            best_correlation="$correlation"
+        fi
+        
+    fi
+done
+
+#print oupturt
+echo "Mean correlation of Homicide Rate with Cantril ladder is $mean_correlation_homicide"
+echo "Mean correlation of GDP with Cantril ladder is $mean_correlation_gdp"
+echo "Mean correlation of Population with Cantril ladder is $mean_correlation_population"
+echo "Mean correlation of Life Expectancy with Cantril ladder is $mean_correlation_life_expectancy"
+echo "Most predictive mean correlation with the Cantril ladder is $best_predictor (r = $best_correlation)"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,84 @@
+#bash
+#The 3 files
+gdp_file=$1
+homicide_file=$2
+life_expectancy_file=$3
+
+#create temporary files to manipulate
+sorted_gdp_file=$(mktemp)
+sorted_homicide_file=$(mktemp)
+sorted_life_expectancy_file=$(mktemp)
+
+#Function to check columns consistency and tab seperation
+check_and_clean_file() {
+    local input_file=$1
+    local output_file=$2
+    local year_col=$3
+
+    #tabs
+    if ! head -n 1 "$input_file" | grep -qP '\t'; then
+        echo "File $input_file is not tab-separated."
+        exit 1
+    fi
+
+    #Get number of columns
+    num_columns=$(head -n 1 "$input_file" | awk -F'\t' '{print NF}') 
+    #check each line & remove continent column
+    awk -F'\t' -v num_columns="$num_columns" -v OFS='\t' -v year_col="$year_col" '
+
+    NR == 1 {
+        #Remove continent header
+        for (i = 1; i <= NF; i++) {
+            if ($i == "Continent") {
+                $i = ""
+            }
+        }
+        print
+        next
+    }
+    {
+        if (NF != num_columns) {
+            print "Inconsistent number of columns in line " NR " of file " FILENAME > "/dev/stderr"
+        }
+        else if ($2 != "" && $year_col >= 2011 && $year_col <= 2021) {
+            #find the index of the continent column
+            for (i = 1; i <= NF; i++) {
+                if ($i == "Continent") {
+                    $i = ""
+                }
+            }
+            print
+
+        }
+
+    }' "$input_file" | cut -f1-$(($num_columns-1)) > "$output_file"
+}
+
+#cleaning each file
+check_and_clean_file "$gdp_file" "$sorted_gdp_file" 3
+check_and_clean_file "$homicide_file" "$sorted_homicide_file" 3
+check_and_clean_file "$life_expectancy_file" "$sorted_life_expectancy_file" 3
+
+#sort
+sort -k1,1 -k3,3 "$sorted_gdp_file" > "${sorted_gdp_file}.sorted"
+sort -k1,1 -k3,3 "$sorted_homicide_file" > "${sorted_homicide_file}.sorted"
+sort -k1,1 -k3,3 "$sorted_life_expectancy_file" > "${sorted_life_expectancy_file}.sorted"
+
+#merging the files
+cleaned_file=$(mktemp)
+join -t $'\t' -a 1 -a 2 -1 1 -2 1 -o 1.1 1.2 1.3 1.5 1.6 2.4 1.4 1.7 "${sorted_gdp_file}.sorted" "${sorted_homicide_file}.sorted" | join -t $'\t' -a 2 -1 1 -2 1 -o 1.1 1.2 1.3 1.4 1.5 1.6 1.7 2.4 1.8 2.5 - "${sorted_life_expectancy_file}.sorted" > "$cleaned_file"
+
+#print thr clean file
+ cat "$cleaned_file"
+
+ #clean temporary files
+ rm "$sorted_gdp_file" "$sorted_homicide_file" "$sorted_life_expectancy_file" "$cleaned_file"
+
+
+
+
+
+
+
+
+
